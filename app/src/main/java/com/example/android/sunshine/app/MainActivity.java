@@ -1,5 +1,9 @@
 package com.example.android.sunshine.app;
 
+import android.content.Intent;
+import android.content.SharedPreferences;
+import android.net.Uri;
+import android.preference.PreferenceManager;
 import android.support.v7.app.ActionBarActivity;
 import android.support.v4.app.Fragment;
 import android.os.Bundle;
@@ -52,9 +56,30 @@ public class MainActivity extends ActionBarActivity {
 
         //noinspection SimplifiableIfStatement
         if (id == R.id.action_settings) {
+            Intent settingsItt = new Intent(this, SettingsActivity.class);
+            startActivity(settingsItt);
             return true;
+        }
+        else if (id == R.id.action_map){
+            openPreferredLocationInMap();
         }
 
         return super.onOptionsItemSelected(item);
+    }
+
+    private void openPreferredLocationInMap(){
+        Intent mapViewItt = new Intent(Intent.ACTION_VIEW);
+        SharedPreferences sharedPreferences = PreferenceManager.getDefaultSharedPreferences(getApplicationContext());
+        String postalCode = sharedPreferences.getString(getString(R.string.pref_location_key), getString(R.string.pref_location_default));
+        Uri geoLocation = Uri.parse("geo:0,0?").buildUpon()
+                .appendQueryParameter("q", postalCode)
+                .build();
+        mapViewItt.setData(geoLocation);
+
+        if (mapViewItt.resolveActivity(getPackageManager()) != null){
+            startActivity(mapViewItt);
+        } else{
+            Log.d(MainActivity.class.getSimpleName(), "Couldn't call " + postalCode + ", no data.");
+        }
     }
 }
