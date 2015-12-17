@@ -1,7 +1,9 @@
 package com.example.android.sunshine.app;
 
 import android.content.Intent;
+import android.database.Cursor;
 import android.support.v4.app.Fragment;
+import android.support.v4.content.CursorLoader;
 import android.support.v4.view.MenuItemCompat;
 import android.support.v7.app.ActionBarActivity;
 import android.os.Bundle;
@@ -14,6 +16,11 @@ import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.TextView;
+
+import android.support.v4.app.LoaderManager;
+import android.support.v4.content.Loader;
+
+import com.example.android.sunshine.app.data.WeatherContract;
 
 public class DetailActivity extends ActionBarActivity {
 
@@ -55,14 +62,34 @@ public class DetailActivity extends ActionBarActivity {
         return super.onOptionsItemSelected(item);
     }
 
+
+
     /**
      * A placeholder fragment containing a simple view.
      */
-    public static class DetailFragment extends Fragment{
+    public static class DetailFragment extends Fragment implements LoaderManager.LoaderCallbacks<Cursor> {
 
         private ShareActionProvider mShareActionProvider;
         private static final String FORECAST_SHARE_HASHTAG = " #SunshineApp";
         private String mForecastStr;
+        private TextView txvWeather;
+        private static final String LOG_TAG = DetailFragment.class.getSimpleName();
+
+        private static final int DETAIL_LOADER_ID = 2;
+
+        private static final String[] FORECAST_COLUMNS = {
+                WeatherContract.WeatherEntry.TABLE_NAME + "." + WeatherContract.WeatherEntry._ID,
+                WeatherContract.WeatherEntry.COLUMN_DATE,
+                WeatherContract.WeatherEntry.COLUMN_SHORT_DESC,
+                WeatherContract.WeatherEntry.COLUMN_MAX_TEMP,
+                WeatherContract.WeatherEntry.COLUMN_MIN_TEMP
+        };
+
+        private static final int COL_WEATHER_ID = 0;
+        private static final int COL_WEATHER_DATE = 1;
+        private static final int COL_WEATHER_DESC = 2;
+        private static final int COL_WEATHER_MAX_TEMP = 3;
+        private static final int COL_WEATHER_MIN_TEMP = 4;
 
         public DetailFragment(){
 
@@ -70,15 +97,15 @@ public class DetailActivity extends ActionBarActivity {
 
         @Override
         public void onCreateOptionsMenu(Menu menu, MenuInflater inflater) {
-            super.onCreateOptionsMenu(menu, inflater);
 
+            // Inflate the menu; this adds items to the action bar if it is present:
             inflater.inflate(R.menu.detail,menu);
 
             // Locate MenuItem with ShareActionProvider:
-            MenuItem item = menu.findItem(R.id.action_share);
+            MenuItem menuItem = menu.findItem(R.id.action_share);
 
             // Fetch and store ShareActionProvider:
-            mShareActionProvider = (ShareActionProvider) MenuItemCompat.getActionProvider(item);
+            mShareActionProvider = (ShareActionProvider) MenuItemCompat.getActionProvider(menuItem);
 
             // Attach an intent to this ShareActionProvider. You can update this at any time,
             // like when the user selects a new piece of data they might like to share:
@@ -95,6 +122,8 @@ public class DetailActivity extends ActionBarActivity {
 
             // Add this line in order for this segment to handle menu events:
             setHasOptionsMenu(true);
+
+            getLoaderManager().initLoader(DETAIL_LOADER_ID, null, this);
         }
 
         @Override
@@ -102,10 +131,11 @@ public class DetailActivity extends ActionBarActivity {
             View rootView = inflater.inflate(R.layout.fragment_detail, container, false);
 
             Intent intInherent = getActivity().getIntent();
-            if (intInherent != null && intInherent.hasExtra(Intent.EXTRA_TEXT)) {
-                mForecastStr = intInherent.getStringExtra(Intent.EXTRA_TEXT);
-                ((TextView) rootView.findViewById(R.id.forecast))
-                        .setText(mForecastStr);
+
+            if (intInherent != null){
+                mForecastStr = intInherent.getDataString();
+                txvWeather = (TextView) rootView.findViewById(R.id.forecast);
+                txvWeather.setText(mForecastStr);
             }
 
             return rootView;
@@ -118,6 +148,50 @@ public class DetailActivity extends ActionBarActivity {
             shareItt.putExtra(Intent.EXTRA_TEXT, mForecastStr + FORECAST_SHARE_HASHTAG);
 
             return shareItt;
+        }
+
+        @Override
+        public Loader<Cursor> onCreateLoader(int id, Bundle args) {
+            Intent intent = getActivity().getIntent();
+
+            if (intent == null){
+                return null;
+            }
+
+            return new CursorLoader(getActivity(),
+                    intent.getData(),
+                    FORECAST_COLUMNS,
+                    null,
+                    null,
+                    null);
+        }
+
+        @Override
+        public void onLoadFinished(Loader<Cursor> loader, Cursor data) {
+            Log.i(LOG_TAG, "In onLoadFinished");
+
+            if(!data.moveToFirst()){
+                return;
+            }
+
+            String dateString = Utility.formatDate(data.getLong(COL_WEATHER_DATE));
+            String weatherDescription = data.getString(COL_WEATHER_DESC);
+            boolean isMetric = Utility.isMetric(getActivity());
+            String high = Utility.formatTemperature(data.getDouble(COL_WEATHER_MAX_TEMP), isMetric);
+            String low = Utility.formatTemperature(data.getDouble(COL_WEATHER_MIN_TEMP), isMetric);
+
+            mForecastStr = String.format("%s - %s - %s/%s", dateString, weatherDescription, high, low);
+            txvWeather.setText(mForecastStr);
+
+            // If OnCreateOptionsMenu has already happened, we need to update the share intent:
+            if (mShareActionProvider != null){
+                mShareActionProvider.setShareIntent(createShareForecastIntent());
+            }
+        }
+
+        @Override
+        public void onLoaderReset(Loader<Cursor> loader) {
+            txvWeather.setText("");
         }
     }
 }

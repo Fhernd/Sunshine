@@ -29,15 +29,21 @@ import java.util.ArrayList;
 
 public class MainActivity extends ActionBarActivity {
 
+    private String mLocation;
+    private static final String FORECASTFRAGMENT_TAG = ForecastFragment.class.getSimpleName();
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         if (savedInstanceState == null) {
             getSupportFragmentManager().beginTransaction()
-                    .add(R.id.container, new ForecastFragment())
+                    .add(R.id.container, new ForecastFragment(), FORECASTFRAGMENT_TAG)
                     .commit();
         }
+
+        SharedPreferences sharedPreferences = PreferenceManager.getDefaultSharedPreferences(getApplicationContext());
+        mLocation = sharedPreferences.getString("location", "94040");
     }
 
     @Override
@@ -65,6 +71,16 @@ public class MainActivity extends ActionBarActivity {
         }
 
         return super.onOptionsItemSelected(item);
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if(!mLocation.equals(Utility.getPreferredLocation(this))){
+            ForecastFragment ff = (ForecastFragment) getSupportFragmentManager().findFragmentByTag(FORECASTFRAGMENT_TAG);
+            ff.onLocationChanged();
+            mLocation = Utility.getPreferredLocation(this);
+        }
     }
 
     private void openPreferredLocationInMap(){
