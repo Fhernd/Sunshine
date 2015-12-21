@@ -1,49 +1,52 @@
 package com.example.android.sunshine.app;
 
+import android.app.ActionBar;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.net.Uri;
+import android.os.Bundle;
 import android.preference.PreferenceManager;
 import android.support.v7.app.ActionBarActivity;
-import android.support.v4.app.Fragment;
-import android.os.Bundle;
 import android.util.Log;
-import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuItem;
-import android.view.View;
-import android.view.ViewGroup;
-import android.widget.AdapterView;
-import android.widget.ArrayAdapter;
-import android.widget.ListAdapter;
-import android.widget.ListView;
-
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.net.HttpURLConnection;
-import java.net.URL;
-import java.util.ArrayList;
 
 
-public class MainActivity extends ActionBarActivity {
+public class MainActivity extends ActionBarActivity implements ForecastFragment.Callback{
 
     private String mLocation;
-    private static final String FORECASTFRAGMENT_TAG = ForecastFragment.class.getSimpleName();
+    private static final String DETAILFRAGMENT_TAG = "DFTAG";
+    private boolean mTwoPane;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        mLocation = Utility.getPreferredLocation(this);
         setContentView(R.layout.activity_main);
-        if (savedInstanceState == null) {
-            getSupportFragmentManager().beginTransaction()
-                    .add(R.id.container, new ForecastFragment(), FORECASTFRAGMENT_TAG)
-                    .commit();
+
+        if (findViewById(R.id.weather_detail_container) != null){
+            // The detail container view will be present only in the large-screen layouts
+            // (res/layout-sw600dp). If this view is present, then the activity should be
+            // in the two pane mode:
+            mTwoPane = true;
+
+            // In two-pane mode, show the deailt view in this activity by adding or
+            // replacing the detail fragment using a fragment transaction:
+            if (savedInstanceState == null){
+                getSupportFragmentManager().beginTransaction()
+                        .replace(R.id.weather_detail_container, new DetailFragment(), DETAILFRAGMENT_TAG)
+                        .commit();
+            }
+        } else {
+            mTwoPane = false;
+            getSupportActionBar().setElevation(0f);
         }
 
-        SharedPreferences sharedPreferences = PreferenceManager.getDefaultSharedPreferences(getApplicationContext());
-        mLocation = sharedPreferences.getString("location", "94040");
+        getSupportActionBar().setIcon(R.drawable.ic_logo);
+        getSupportActionBar().setDisplayOptions(ActionBar.DISPLAY_SHOW_HOME);
+
+        ForecastFragment forecastFragment = ((ForecastFragment) getSupportFragmentManager().findFragmentById(R.id.fragment_forecast));
+        forecastFragment.setUseTodayLayout(!mTwoPane);
     }
 
     @Override
@@ -76,10 +79,23 @@ public class MainActivity extends ActionBarActivity {
     @Override
     protected void onResume() {
         super.onResume();
-        if(!mLocation.equals(Utility.getPreferredLocation(this))){
-            ForecastFragment ff = (ForecastFragment) getSupportFragmentManager().findFragmentByTag(FORECASTFRAGMENT_TAG);
-            ff.onLocationChanged();
-            mLocation = Utility.getPreferredLocation(this);
+
+        String location = Utility.getPreferredLocation(this);
+
+        // Update the location in our second pane using the fragment manager:
+        if(location != null && !mLocation.equals(location)){
+            ForecastFragment ff = (ForecastFragment) getSupportFragmentManager().findFragmentById(R.id.fragment_forecast);
+            if (null != ff){
+                ff.onLocationChanged();
+            }
+
+            DetailFragment df = (DetailFragment) getSupportFragmentManager().findFragmentByTag(DETAILFRAGMENT_TAG);
+
+            if (null != df){
+                df.onLocationChanged(location);
+            }
+
+            mLocation = location;
         }
     }
 
@@ -98,4 +114,29 @@ public class MainActivity extends ActionBarActivity {
             Log.d(MainActivity.class.getSimpleName(), "Couldn't call " + postalCode + ", no data.");
         }
     }
+
+    @Override
+    public void onItemSelected(Uri contentUri) {
+        if (mTwoPane){
+            // In two-pane, show the detail view in this activity by
+            // adding or replacing the detail fragment using a
+            // fragment transaction:
+            Bundle args = new Bundle();
+            args.putParcelable(DetailFragment.DETAIL_URI, contentUri);
+
+            DetailFragment fragment = new DetailFragment();
+            fragment.setArguments(args);
+
+            getSupportFragmentManager().beginTransaction()
+                    .replace(R.id.weather_detail_container, fragment, DETAILFRAGMENT_TAG)
+                    .commit();
+        } else {
+            Intent intent = new Intent(this, DetailActivity.class)
+                    .setData(contentUri);
+
+            startActivity(intent);
+        }
+    }
+
+
 }
